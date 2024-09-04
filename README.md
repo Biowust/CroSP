@@ -8,7 +8,6 @@ model: Model part
 
 Tutorial:Further analysis and drawing
 
-Links to 151673 result files that can be used in the tutorial：https://pan.baidu.com/s/1Ar4-lOTYRaPATGISBSs26w?pwd=2q6c 提取码: 2q6c 
 
 
 ## Getting started
@@ -16,9 +15,9 @@ Links to 151673 result files that can be used in the tutorial：https://pan.baid
 
   python analyze_DLPFC.py
 
-  Further analysis and drawing:
+  Further analysis and drawing:  Tutorial/analyze_DLPFC.ipynb
 
-  Tutorial/analyze_DLPFC.ipynb
+  Links to 151673 result files that can be used in the tutorial：https://pan.baidu.com/s/1Ar4-lOTYRaPATGISBSs26w?pwd=2q6c 提取码: 2q6c 
 
 ## Software dependencies
 python==3.9
