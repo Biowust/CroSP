@@ -8,6 +8,8 @@ model: Model part
 
 Tutorial:Further analysis and drawing
 
+Links to 151673 result files that can be used in the tutorial：https://pan.baidu.com/s/1Ar4-lOTYRaPATGISBSs26w?pwd=2q6c 提取码: 2q6c 
+
 
 ## Getting started
 - #### CroSP on DLPFC from 10x Visium.
