@@ -1,10 +1,13 @@
 # CroSP
 ### Code folder meaning:
 data: Folder where the dataset is stored
+
 build_data: Build folders for multi-view data
+
 model: Model part
-Results:Results folder
+
 Tutorial:Further analysis and drawing
+
 
 ## Getting started
 - #### CroSP on DLPFC from 10x Visium.
