@@ -44,7 +44,7 @@ and then you can use pip to install the following dependencies within the CroSP 
 
 2. Further analysis and drawing:  Tutorial/analyze_osmFISH.ipynb
 
-  Links to osmFISH result files that can be used in the tutorial：https://pan.baidu.com/s/1taWqCN_2HPC4NtGZ6SP0iA?pwd=esmx 提取码: esmx 
+  Links to osmFISH result files that can be used in the tutorial：https://pan.baidu.com/s/1Oj4oOYtEgB0dNf1B1mzq8g?pwd=chpg 提取码: chpg 
 
 ## <a name="Citation"></a>Citation
 ## <a name="contact"></a>Contact
