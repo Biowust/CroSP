@@ -47,7 +47,7 @@ and then you can use pip to install the following dependencies within the CroSP 
   Links to osmFISH result files that can be used in the tutorial：https://pan.baidu.com/s/1CyKDUA4DvHHfn9xmP9yJpg?pwd=yc1q 提取码: yc1q 
 ## <a name="Citation"></a>Citation
 ## <a name="contact"></a>Contact
-Feixiong Cheng chengf@ccf.org College of Computer Science and Electronic Engineering, Hunan University, Changsha, Hunan, 410082, China.<br> 
-Xiangxiang Zeng xzeng@hnu.edu.cn Genomic Medicine Institute, Lerner Research Institute, Cleveland Clinic, Cleveland, OH 44195, USA<br> 
+Feixiong Cheng chengf@ccf.org Genomic Medicine Institute, Lerner Research Institute, Cleveland Clinic, Cleveland, OH 44195, USA<br> 
+Xiangxiang Zeng xzeng@hnu.edu.cn College of Computer Science and Electronic Engineering, Hunan University, Changsha, Hunan, 410082, China<br> 
 Junlin Xu xjl@hnu.edu.cn School of Computer Science and Technology, Wuhan University of Science and Technology, Wuhan, Hubei 430065, China
 
