@@ -8,6 +8,43 @@ from .util import get_logger, build_adj
 from .datasets import load_data
 
 
+def build_optimizer(completer, config):
+    """Build the historical optimizer or an optional fusion-specific group."""
+
+    fusion_lr = getattr(config, 'fusion_lr', None)
+    if fusion_lr is None:
+        return torch.optim.Adam(
+            itertools.chain(
+                completer.spa_encoder.parameters(),
+                completer.img_encoder.parameters(),
+                completer.fusion_model.parameters(),
+            ),
+            lr=config.lr,
+            weight_decay=config.weight_decay,
+        )
+    if float(fusion_lr) <= 0.0:
+        raise ValueError("fusion_lr must be positive")
+    return torch.optim.Adam(
+        [
+            {
+                'params': itertools.chain(
+                    completer.spa_encoder.parameters(),
+                    completer.img_encoder.parameters(),
+                ),
+                'lr': config.lr,
+                'weight_decay': config.weight_decay,
+            },
+            {
+                'params': completer.fusion_model.parameters(),
+                'lr': float(fusion_lr),
+                'weight_decay': float(
+                    getattr(config, 'fusion_weight_decay', 0.0)
+                ),
+            },
+        ]
+    )
+
+
 def main(save_path, config):
     use_cuda = torch.cuda.is_available()
     device = torch.device('cuda:0' if use_cuda else 'cpu')
@@ -29,12 +66,10 @@ def main(save_path, config):
     x2_edge = build_adj(x2_train_raw_edge)
 
     input_size = x1_train.size(1)
+    input_size2 = x2_train.size(1)
     # Build the model
-    COMPLETER = Completer(config, input_size)
-    optimizer = torch.optim.Adam(
-        itertools.chain(COMPLETER.spa_encoder.parameters(), COMPLETER.img_encoder.parameters(),
-                        COMPLETER.fusion_model.parameters()),
-        lr=config.lr, weight_decay=config.weight_decay)
+    COMPLETER = Completer(config, input_size, input_size2=input_size2)
+    optimizer = build_optimizer(COMPLETER, config)
     COMPLETER.to_device(device)
 
     logger.info(COMPLETER.spa_encoder)
@@ -48,6 +83,21 @@ def main(save_path, config):
     x_hat1 = x_hat1.cpu().detach().numpy()
     x_hat2 = x_hat2.cpu().detach().numpy()
     z_f1 = z_f1.cpu().detach().numpy()
+    output_payload = {'data': latent_fusion}
+    if getattr(config, 'save_view_embeddings', False):
+        view_embeddings = COMPLETER.last_view_embeddings
+        output_payload.update({
+            'z1': view_embeddings['z1'].cpu().numpy(),
+            'z2': view_embeddings['z2'].cpu().numpy(),
+            'zf': view_embeddings['zf'].cpu().numpy(),
+        })
+    if (
+        getattr(config, 'save_fusion_weights', False)
+        and COMPLETER.last_fusion_weights is not None
+    ):
+        output_payload['fusion_weights'] = (
+            COMPLETER.last_fusion_weights.cpu().numpy()
+        )
 
     task_type = config.task_type
     data_type = config.data_type
@@ -57,18 +107,17 @@ def main(save_path, config):
         output_dir = os.path.join(save_path, 'Data', config.dataset_name, data_name)
         os.makedirs(output_dir, exist_ok=True)
         scio.savemat(os.path.join(output_dir, f'{data_name}_model_output.mat'),
-                     {'data': z_f1})
+                     output_payload)
     elif task_type == 'Identify':
         output_dir = os.path.join(save_path, 'Data', data_type, data_name)
         os.makedirs(output_dir, exist_ok=True)
         scio.savemat(os.path.join(output_dir, f'{data_name}_model_output.mat'),
-                     {'data': latent_fusion})
+                     output_payload)
     else:
         output_dir = os.path.join(save_path, 'Data', task_type, data_name)
         os.makedirs(output_dir, exist_ok=True)
         scio.savemat(os.path.join(output_dir, f'{data_name}_model_output.mat'),
-                     {'data': latent_fusion})
+                     output_payload)
 
     logger.info('--------------------Training over--------------------')
-    return z_f1
-
+    return latent_fusion

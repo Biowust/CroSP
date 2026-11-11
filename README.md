@@ -1,53 +1,110 @@
 # CroSP
-Deep learning-based enhancing spatial biological context parsing
+
+**Deep learning-based enhancing spatial biological context parsing**
+
+CroSP is a deep learning framework for spatial omics analysis. It integrates gene expression, spatial locations, and histological image features, where available, to learn representations for spatial domain identification and downstream biological analysis.
+
 ## Table of contents
-- [Network diagram](#diagram)
-- [Installation](#Installation)
-- [Usage](#Usage)
-- [Citation](#Citation)
+
+- [Overview](#overview)
+- [Installation](#installation)
+- [Data availability](#data-availability)
+- [Usage](#usage)
+- [Tutorials](#tutorials)
+- [Citation](#citation)
 - [Contact](#contact)
 
-## <a name="diagram"></a>Network diagram
+## Overview
 
-## <a name="Installation"></a>Installation
-**Environment requirements**:  
-CroSP requires Python 3.9.x and Pytorch.   
-For example, we suggest to install the dependencies in a conda environment.  
+![Overview of the CroSP workflow](assets/fig1.jpg)
 
-```
-conda create -n CroSP
+The CroSP workflow includes graph construction and spatial data augmentation, representation learning with a two-branch encoder–decoder network, and downstream applications such as spatial domain identification, analysis of tumor heterogeneity, spatially variable gene identification, and trajectory analysis.
+
+## Installation
+
+CroSP uses Python 3.9 and PyTorch. Create a conda environment before installing the dependencies:
+
+```bash
+conda create -n CroSP python=3.9.18
 conda activate CroSP
 ```
-and then you can use pip to install the following dependencies within the CroSP environment.
-- python==3.9.18
-- torch==1.13.0+cu116 
-- torch_scatter==2.1.1
-- torch_sparse==0.6.17
-- Pillow==9.5.0
-- pandas==1.5.3
-- scanpy==1.9.2
-- pot==0.9.1
-- scikit-learn==1.2.1
-- rpy2==3.4.1
-- R==4.0.3
-## <a name="Usage"></a>Usage 
-- #### CroSP on DLPFC from 10x Visium.
 
-1. python analyze_DLPFC.py 
+The dependency versions used in the original implementation are:
 
-2. Further analysis and drawing:  Tutorial/analyze_DLPFC.ipynb
+| Dependency | Version |
+| --- | --- |
+| Python | 3.9.18 |
+| PyTorch | 1.13.0+cu116 |
+| torch_scatter | 2.1.1 |
+| torch_sparse | 0.6.17 |
+| Pillow | 9.5.0 |
+| pandas | 1.5.3 |
+| scanpy | 1.9.2 |
+| POT | 0.9.1 |
+| scikit-learn | 1.2.1 |
+| rpy2 | 3.4.1 |
+| R | 4.0.3 |
 
-  Links to 151673 result files that can be used in the tutorial：https://pan.baidu.com/s/1Ar4-lOTYRaPATGISBSs26w?pwd=2q6c 提取码: 2q6c 
-- #### CroSP on osmFISH.
+R and the `mclust` package are needed for analyses using mclust clustering. Install `mclust` in R:
 
-1. python analyze_osmFISH.py 
+```r
+install.packages("mclust")
+```
 
-2. Further analysis and drawing:  Tutorial/analyze_osmFISH.ipynb
+## Data availability
 
-  Links to osmFISH result files that can be used in the tutorial：https://pan.baidu.com/s/1CyKDUA4DvHHfn9xmP9yJpg?pwd=yc1q 提取码: yc1q 
-## <a name="Citation"></a>Citation
-## <a name="contact"></a>Contact
-Feixiong Cheng chengf@ccf.org Genomic Medicine Institute, Lerner Research Institute, Cleveland Clinic, Cleveland, OH 44195, USA<br> 
-Xiangxiang Zeng xzeng@hnu.edu.cn College of Computer Science and Electronic Engineering, Hunan University, Changsha, Hunan, 410082, China<br> 
-Junlin Xu xjl@hnu.edu.cn School of Computer Science and Technology, Wuhan University of Science and Technology, Wuhan, Hubei 430065, China
+The CroSP data archive is available on Zenodo:
 
+**[Download the data from Zenodo — DOI: 10.5281/zenodo.22658895](https://doi.org/10.5281/zenodo.22658895)**
+
+Download the files needed for the selected dataset and place them at the input paths specified in its analysis script or notebook. The tutorials use prepared data and saved model outputs; they do not download these files automatically.
+
+## Usage
+
+Run the analysis scripts from the repository root. Set the dataset paths and sample identifiers in the selected script before running it.
+
+### DLPFC (10x Visium)
+
+```bash
+python analyze_DLPFC.py
+```
+
+For downstream analysis and visualization, see [the DLPFC tutorial](Tutorial/analyze_DLPFC.ipynb).
+
+The original example result files for sample 151673 are also available on [Baidu Netdisk](https://pan.baidu.com/s/1Ar4-lOTYRaPATGISBSs26w?pwd=2q6c) (extraction code: `2q6c`).
+
+### osmFISH
+
+```bash
+python analyze_osmFISH.py
+```
+
+For downstream analysis and visualization, see [the osmFISH tutorial](Tutorial/analyze_osmFISH.ipynb).
+
+The original osmFISH example result files are also available on [Baidu Netdisk](https://pan.baidu.com/s/1CyKDUA4DvHHfn9xmP9yJpg?pwd=yc1q) (extraction code: `yc1q`).
+
+## Tutorials
+
+| Dataset | Notebook |
+| --- | --- |
+| DLPFC | [analyze_DLPFC.ipynb](Tutorial/analyze_DLPFC.ipynb) |
+| osmFISH | [analyze_osmFISH.ipynb](Tutorial/analyze_osmFISH.ipynb) |
+| 3D hippocampus | [analyze_3D.ipynb](Tutorial/analyze_3D.ipynb) |
+| Chicken heart (D7 and D14) | [analyze_chicken_heart.ipynb](Tutorial/analyze_chicken_heart.ipynb) |
+
+Open the selected notebook in the CroSP environment and follow its cells in order. Update local working-directory and input paths to match your installation.
+
+## Citation
+
+CroSP accompanies the manuscript **“Deep learning-based enhancing spatial biological context parsing.”**
+
+When using the shared data, please also cite the [Zenodo data record](https://doi.org/10.5281/zenodo.22658895).
+
+## Contact
+
+- **Feixiong Cheng** — chengf@ccf.org  
+  Genomic Medicine Institute, Lerner Research Institute, Cleveland Clinic, Cleveland, OH 44195, USA
+- **Xiangxiang Zeng** — xzeng@hnu.edu.cn  
+  College of Computer Science and Electronic Engineering, Hunan University, Changsha, Hunan 410082, China
+- **Junlin Xu** — xjl@hnu.edu.cn  
+  School of Computer Science and Technology, Wuhan University of Science and Technology, Wuhan, Hubei 430065, China

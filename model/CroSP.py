@@ -121,13 +121,71 @@ class GCNDecoder(nn.Module):
         return z
 
 class AdaptiveFusionLayer(nn.Module):
-    def __init__(self):
+    def __init__(self, gamma_init=0.6):
         super(AdaptiveFusionLayer, self).__init__()
-        self.gamma = nn.Parameter(torch.tensor(0.6))
+        if not 0.0 <= gamma_init <= 1.0:
+            raise ValueError("gamma_init must lie in [0, 1]")
+
+        gamma_init_tensor = torch.tensor(float(gamma_init))
+        eps = torch.finfo(gamma_init_tensor.dtype).eps
+        gamma_init_tensor = gamma_init_tensor.clamp(min=eps, max=1.0 - eps)
+        self.gamma_logit = nn.Parameter(torch.logit(gamma_init_tensor))
+
+    @property
+    def gamma(self):
+        """Bounded weight assigned to the spatial gene expression view."""
+        return torch.sigmoid(self.gamma_logit)
 
     def forward(self, m1, m2):
-        fused_representation = self.gamma * m1 + (1 - self.gamma) * m2
+        gamma = self.gamma
+        fused_representation = gamma * m1 + (1 - gamma) * m2
         return fused_representation
+
+
+class SymmetricSpotwiseFusionLayer(nn.Module):
+    """Learn one convex pair of view weights for every spot.
+
+    The same scorer is applied to both views.  Swapping ``m1`` and ``m2``
+    therefore swaps their weights but leaves the fused representation
+    unchanged.  The final scoring layer is initialized at zero so every spot
+    starts from an unbiased 0.5/0.5 fusion.
+    """
+
+    def __init__(self, embedding_dim, hidden_dim=16, temperature=1.0):
+        super(SymmetricSpotwiseFusionLayer, self).__init__()
+        if int(embedding_dim) < 1:
+            raise ValueError("embedding_dim must be positive")
+        if int(hidden_dim) < 1:
+            raise ValueError("hidden_dim must be positive")
+        if float(temperature) <= 0.0:
+            raise ValueError("temperature must be positive")
+
+        self.temperature = float(temperature)
+        self.shared_scorer = nn.Sequential(
+            nn.LayerNorm(int(embedding_dim)),
+            nn.Linear(int(embedding_dim), int(hidden_dim)),
+            nn.Tanh(),
+            nn.Linear(int(hidden_dim), 1, bias=False),
+        )
+        nn.init.zeros_(self.shared_scorer[-1].weight)
+        self.last_weights = None
+
+    def forward(self, m1, m2):
+        if m1.shape != m2.shape:
+            raise ValueError(
+                "Spotwise fusion requires equal view shapes; "
+                f"got {tuple(m1.shape)} and {tuple(m2.shape)}"
+            )
+        if m1.ndim != 2:
+            raise ValueError(
+                f"Spotwise fusion expects 2D embeddings; got {tuple(m1.shape)}"
+            )
+
+        stacked = torch.stack((m1, m2), dim=1)
+        scores = self.shared_scorer(stacked).squeeze(-1) / self.temperature
+        weights = torch.softmax(scores, dim=1)
+        self.last_weights = weights
+        return torch.sum(weights.unsqueeze(-1) * stacked, dim=1)
 
 class InnerProductDecoder(nn.Module):
     """Decoder for using inner product for prediction."""
@@ -143,14 +201,31 @@ class InnerProductDecoder(nn.Module):
 
 class Completer():
 
-    def __init__(self, config, input_size):
+    def __init__(self, config, input_size, input_size2=None):
         """Constructor.
         """
         self._config = config
         self.embedding_dim = list(map(int, config.emb_dim))
+        if input_size2 is None:
+            input_size2 = input_size
         self.spa_encoder = GraphAutoencoder(input_size, self.embedding_dim, config)
-        self.img_encoder = GraphAutoencoder(input_size,  self.embedding_dim, config)
-        self.fusion_model = AdaptiveFusionLayer()
+        self.img_encoder = GraphAutoencoder(input_size2, self.embedding_dim, config)
+        fusion_type = getattr(config, "fusion_type", "scalar")
+        if fusion_type == "scalar":
+            self.fusion_model = AdaptiveFusionLayer(
+                gamma_init=getattr(config, "gamma_init", 0.6)
+            )
+        elif fusion_type == "spotwise":
+            self.fusion_model = SymmetricSpotwiseFusionLayer(
+                embedding_dim=self.embedding_dim[-1],
+                hidden_dim=getattr(config, "fusion_hidden_dim", 16),
+                temperature=getattr(config, "fusion_temperature", 1.0),
+            )
+        else:
+            raise ValueError(
+                "fusion_type must be 'scalar' or 'spotwise'; "
+                f"got {fusion_type!r}"
+            )
 
     def to_device(self, device):
         """ to cuda if gpu is used """
@@ -194,6 +269,25 @@ class Completer():
 
             z_f = self.fusion_model(z_1, z_2)
 
+            fusion_smoothness = torch.zeros((), device=z_f.device)
+            fusion_smoothness_weight = float(
+                getattr(config, "fusion_smoothness_weight", 0.0)
+            )
+            if (
+                fusion_smoothness_weight > 0.0
+                and hasattr(self.fusion_model, "last_weights")
+                and self.fusion_model.last_weights is not None
+            ):
+                spatial_edges = x1_edge[0].long()
+                non_self = spatial_edges[0] != spatial_edges[1]
+                if torch.any(non_self):
+                    source = spatial_edges[0, non_self]
+                    target = spatial_edges[1, non_self]
+                    rna_weight = self.fusion_model.last_weights[:, 0]
+                    fusion_smoothness = torch.mean(
+                        (rna_weight[source] - rna_weight[target]).pow(2)
+                    )
+
             z_f_1 = self.spa_encoder.decoder(z_f, x1_edge)
             z_f_2 = self.img_encoder.decoder(z_f, x2_edge)
             z_hat1_edge = self.spa_encoder.dc(z_f)
@@ -210,6 +304,7 @@ class Completer():
                 loss = cl_loss_inter * config.lambda1 + (recon1+recon2) * config.lambda2
             else:
                 loss = cl_loss_inter * config.lambda1 + (recon1+recon2) * config.lambda2 + metric*config.lambda3
+            loss = loss + fusion_smoothness_weight * fusion_smoothness
 
             optimizer.zero_grad()
             gradient_clipping = 5
@@ -233,12 +328,37 @@ class Completer():
                 output = "Epoch : {:.0f}/{:.0f} ===> Reconstruction1 loss = {:.4f}===>Reconstruction2 loss = {:.4f}===> Contrastive loss = {:.4f} ===> Loss = {:.4f}" \
                     .format((epoch + 1), config.epoch, loss_rec1, loss_rec2, loss_cl, loss_all)
                 logger.info("\033[2;29m" + output + "\033[0m")
+        if hasattr(self.fusion_model, "gamma"):
+            logger.info(
+                "Final adaptive fusion gamma = {:.6f}".format(
+                    self.fusion_model.gamma.detach().item()
+                )
+            )
+        elif self.fusion_model.last_weights is not None:
+            weights = self.fusion_model.last_weights.detach()
+            logger.info(
+                "Final spotwise RNA weight: mean={:.6f}, std={:.6f}, "
+                "min={:.6f}, max={:.6f}".format(
+                    weights[:, 0].mean().item(),
+                    weights[:, 0].std(unbiased=False).item(),
+                    weights[:, 0].min().item(),
+                    weights[:, 0].max().item(),
+                )
+            )
+        # Keep the final pre-update embeddings available for optional,
+        # explicitly requested branch diagnostics.  The public return contract
+        # remains unchanged so historical training entrypoints are unaffected.
+        self.last_view_embeddings = {
+            "z1": z_1.detach(),
+            "z2": z_2.detach(),
+            "zf": z_f.detach(),
+        }
+        self.last_fusion_weights = (
+            self.fusion_model.last_weights.detach()
+            if hasattr(self.fusion_model, "last_weights")
+            and self.fusion_model.last_weights is not None
+            else None
+        )
         return z_f, x_hat1, x_hat2, z_f_1
-
-
-
-
-
-
 
 

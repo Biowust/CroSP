@@ -33,10 +33,22 @@ def get_logger():
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s: - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S')
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    # model.main() can be called repeatedly in a seed/configuration sweep.
+    # Reuse our stream handler so every call does not duplicate all later logs.
+    handlers = [
+        handler
+        for handler in logger.handlers
+        if getattr(handler, "_crosp_stream_handler", False)
+    ]
+    if handlers:
+        ch = handlers[0]
+        ch.setFormatter(formatter)
+    else:
+        ch = logging.StreamHandler()
+        ch._crosp_stream_handler = True
+        ch.setLevel(logging.DEBUG)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
     return logger
 
 def tranfer(A, size):
@@ -53,7 +65,8 @@ def build_adj(adj):
     # 将 NumPy ndarray 转换为稀疏矩阵
     sparse_matrix = sp.coo_matrix(adj)
     # 提取边的索引和权重
-    edge_index = torch.tensor([sparse_matrix.row, sparse_matrix.col], dtype=torch.float32).to(device)
+    indices = np.vstack((sparse_matrix.row, sparse_matrix.col))
+    edge_index = torch.from_numpy(indices).to(dtype=torch.float32, device=device)
     values = torch.tensor(sparse_matrix.data, dtype=torch.float32).to(device)
     return edge_index, values, adj.shape
 
@@ -73,7 +86,28 @@ def mclust_R(adata, num_cluster, modelNames='EEE', used_obsm='CroSP', random_see
     r_random_seed(random_seed)
     rmclust = robjects.r['Mclust']
 
-    res = rmclust(rpy2.robjects.numpy2ri.numpy2rpy(adata.obsm[used_obsm]), num_cluster, modelNames)
+    embedding = np.asarray(adata.obsm[used_obsm], dtype=np.float64)
+    if embedding.ndim != 2:
+        raise ValueError(
+            f"mclust input must be a 2D matrix, got shape {embedding.shape}"
+        )
+    if not np.isfinite(embedding).all():
+        raise ValueError("mclust input contains non-finite values")
+    r_embedding = rpy2.robjects.numpy2ri.numpy2rpy(embedding)
+    # With mclust 6.1.3, a matrix passed directly through rpy2 has no column
+    # names. Mclust then deparses the full foreign-call expression and may
+    # generate a dimnames vector longer than ncol(data). Explicit feature names
+    # avoid that bridge-specific failure without changing the numeric matrix.
+    feature_names = robjects.StrVector(
+        [f"feature_{index + 1}" for index in range(embedding.shape[1])]
+    )
+    r_embedding = robjects.r['colnames<-'](r_embedding, feature_names)
+    res = rmclust(
+        r_embedding,
+        num_cluster,
+        modelNames,
+        verbose=False,
+    )
     mclust_res = np.array(res[-2])
 
     adata.obs['mclust'] = mclust_res
@@ -115,8 +149,6 @@ def filter_with_overlap_gene(adata, adata_sc):
     adata_sc = adata_sc[:, genes]
 
     return adata, adata_sc
-
-
 
 
 

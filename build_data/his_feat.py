@@ -138,7 +138,11 @@ def image_crop(
             imagecol_right = imagecol + crop_size / 2
             tile = img_pillow.crop(
                 (imagecol_left, imagerow_down, imagecol_right, imagerow_up))
-            tile.thumbnail((target_size, target_size), Image.ANTIALIAS)  #####
+            # Pillow >= 10 removed ``Image.ANTIALIAS``.  LANCZOS is the
+            # equivalent high-quality downsampling filter in both the new
+            # ``Image.Resampling`` enum and older Pillow releases.
+            resampling = getattr(Image, "Resampling", Image).LANCZOS
+            tile.thumbnail((target_size, target_size), resampling)  #####
             tile.resize((target_size, target_size))  ######
             tile_name = str(imagecol) + "-" + str(imagerow) + "-" + str(crop_size)
             out_tile = Path(save_path) / (tile_name + ".png")
