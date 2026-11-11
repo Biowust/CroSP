@@ -96,7 +96,9 @@ Open the selected notebook in the CroSP environment and follow its cells in orde
 
 ## Citation
 
-CroSP accompanies the manuscript **“Deep learning-based enhancing spatial biological context parsing.”**
+If you use CroSP in your research, please cite:
+
+**Deep learning-based enhancing spatial biological context parsing.** *Bioinformatics* (accepted for publication). DOI: [10.1093/bioinformatics/btag829](https://doi.org/10.1093/bioinformatics/btag829).
 
 When using the shared data, please also cite the [Zenodo data record](https://doi.org/10.5281/zenodo.22658895).
 
